@@ -4,7 +4,7 @@ from django.db import models
 class BotUsers(models.Model):
     '''Пользователи бота'''
 
-    user_tlg_id = models.CharField(verbose_name='ID телеграма пользователя', max_length=50)
+    user_tlg_id = models.CharField(verbose_name='ID телеграма пользователя', max_length=50, db_index=True)
     user_tlg_name = models.CharField(verbose_name='Имя пользователя в телеграме', max_length=100)
     program = models.ForeignKey(verbose_name='Программа', to='Programs', on_delete=models.CASCADE, blank=True, null=True)
     training = models.ForeignKey(verbose_name='Тренировка', to='TrainingsForPrograms', on_delete=models.CASCADE, blank=True, null=True)
@@ -54,7 +54,7 @@ class TrainingsForPrograms(models.Model):
         verbose_name_plural = 'Тренировки для программ'
 
     def __str__(self):
-        return self.training_number
+        return str(self.training_number)
 
 
 class UsersTrainingResults(models.Model):
@@ -63,6 +63,7 @@ class UsersTrainingResults(models.Model):
     training = models.ForeignKey(to=TrainingsForPrograms, on_delete=models.CASCADE, verbose_name='Тренировка')
     date = models.DateField(verbose_name='Дата', auto_now_add=True)
     result = models.TextField(verbose_name='Результат', max_length=2000)
+    user = models.ForeignKey(to=BotUsers, on_delete=models.CASCADE, verbose_name='Пользователь', null=True, blank=True)
 
     class Meta:
         ordering = ['-date']
@@ -71,7 +72,7 @@ class UsersTrainingResults(models.Model):
         verbose_name_plural = 'Результаты тренировок пользователей'
 
     def __str__(self):
-        return self.training
+        return self.result
 
 
 class WODs(models.Model):
