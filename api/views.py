@@ -73,30 +73,31 @@ class UserTrainingResultsView(APIView):
         training_id = request.query_params.get('id')
         if user_tlg_id:
             # если есть user_tlg_id, то получаем список всех результатов тренировок
-            result_object = UsersTrainingResults.objects.select_related('user').filter(user__user_tlg_id=user_tlg_id)
+            user_results = UsersTrainingResults.objects.filter(user__user_tlg_id=user_tlg_id).select_related('user')
+            results_objects = UsersTrainingResultsSerializer(user_results, many=True)
         elif training_id:
             # если есть training_id, то получаем конкретный результат тренировки
-            result_object = UsersTrainingResults.objects.get(pk=training_id)
+            results_objects = UsersTrainingResults.objects.get(pk=training_id)
         else:
             return Response(status.HTTP_400_BAD_REQUEST)
-        return Response(result_object, status.HTTP_200_OK)
+        return Response(results_objects.data, status.HTTP_200_OK)
+
+        # "training": 1,
+        # "date": "2022-06-14",
+        # "result": "1233 повторений",
+        # "user": 1
 
     def post(self, request, format=None):
-        user_tlg_id = request.data.get('user_tlg_id')
-        training_result = request.data.get('training_result')
-        user = BotUsers.objects.get(user_tlg_id=user_tlg_id)
-        current_training = user.training
-        serializer = UsersTrainingResultsSerializer(
-            training=current_training,
-            result=training_result,
-            user=user
-        )
+        print('WE ARE HEREE')
+        serializer = UsersTrainingResultsSerializer(data=request.data)
         if serializer.is_valid():
-            UsersTrainingResults(serializer.validated_data).save()  # возможен выброс исключения(проверить при ошибках)
-            user_training_number = user.training.training_number
-            next_training = TrainingsForPrograms.objects.get(training_number=user_training_number + 1)
-            user.training = next_training
-            user.save()
+            print('WE ARE HEREE')
+            UsersTrainingResults(serializer).save()  # возможен выброс исключения(проверить при ошибках)
+            print('WE ARE HEREE')
+            # user_training_number = user.training.training_number
+            # next_training = TrainingsForPrograms.objects.get(training_number=user_training_number + 1)
+            # user.training = next_training
+            # user.save()
             return Response(status.HTTP_200_OK)
         else:
             return Response(status.HTTP_400_BAD_REQUEST)
