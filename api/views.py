@@ -1,3 +1,4 @@
+import datetime
 import random
 
 from rest_framework import status
@@ -5,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.models import BotUsers, UsersTrainingResults, TrainingsForPrograms, Programs, WODs, UsersWodResults, Coaches
-from api.serializers import UsersTrainingResultsSerializer, UsersWodResultsSerializer
+from api.serializers import UsersTrainingResultsSerializer, UsersWodResultsSerializer, ProgramsSerializer
 
 
 class UserInfoView(APIView):
@@ -82,22 +83,21 @@ class UserTrainingResultsView(APIView):
             return Response(status.HTTP_400_BAD_REQUEST)
         return Response(results_objects.data, status.HTTP_200_OK)
 
-        # "training": 1,
-        # "date": "2022-06-14",
-        # "result": "1233 повторений",
-        # "user": 1
-
     def post(self, request, format=None):
-        print('WE ARE HEREE')
         serializer = UsersTrainingResultsSerializer(data=request.data)
         if serializer.is_valid():
-            print('WE ARE HEREE')
-            UsersTrainingResults(serializer).save()  # возможен выброс исключения(проверить при ошибках)
-            print('WE ARE HEREE')
-            # user_training_number = user.training.training_number
-            # next_training = TrainingsForPrograms.objects.get(training_number=user_training_number + 1)
-            # user.training = next_training
-            # user.save()
+            training = TrainingsForPrograms.objects.get(pk=serializer.data.get('training'))
+            user = BotUsers.objects.get(pk=serializer.data.get('user'))
+            UsersTrainingResults.objects.create(
+                training=training,
+                date=datetime.date.today(),
+                result=serializer.data.get('result'),
+                user=user,
+            )
+            user_training_number = user.training.training_number
+            next_training = TrainingsForPrograms.objects.get(training_number=user_training_number + 1)
+            user.training = next_training
+            user.save()
             return Response(status.HTTP_200_OK)
         else:
             return Response(status.HTTP_400_BAD_REQUEST)
@@ -108,26 +108,37 @@ class CleanResultsView(APIView):
     и удаление связи FK программы тренировок'''
 
     def get(self, request, format=None):
-        user_tlg_id = request.data.get('user_tlg_id')
-        user_object = BotUsers.objects.get(user_tlg_id=user_tlg_id)
-        # удаляем результаты тренировок пользователя
-        training_results_lst = UsersTrainingResults.objects.filter(user=user_object).delete()
-        # очищаем поля программы и тренировки
-        user_object.program = None
-        user_object.training = None
-        user_object.save()
+        user_tlg_id = request.query_params.get('user_tlg_id')
+        if user_tlg_id:
+            user_object = BotUsers.objects.get(user_tlg_id=user_tlg_id)
+            # удаляем результаты тренировок пользователя
+            UsersTrainingResults.objects.filter(user=user_object).delete()
+            # очищаем поля программы и тренировки
+            user_object.program = None
+            user_object.training = None
+            user_object.save()
+            return Response(status.HTTP_200_OK)
+        else:
+            return Response(status.HTTP_400_BAD_REQUEST)
 
 
 class ProgramsView(APIView):
     '''Представление списка программ или деталей программы тренировок'''
 
     def get(self, request, format=None):
-        program_id = request.data.get('program_id')
-        if program_id:
-            result_object = Programs.objects.get(pk=program_id)
-        else:
-            result_object = Programs.objects.all()
-        return Response(result_object, status.HTTP_200_OK)
+        program_id = request.query_params.get('program_id')
+        try:
+            if program_id:
+                print('HEREEEE....')
+                program_object = Programs.objects.get(pk=program_id)
+                result_object = ProgramsSerializer(program_object, many=False)
+            else:
+                print('HEREEEE....2')
+                programs_lst = Programs.objects.all()
+                result_object = ProgramsSerializer(programs_lst, many=True)
+            return Response(result_object.data, status.HTTP_200_OK)
+        except Exception:
+            return Response(status.HTTP_400_BAD_REQUEST)
 
 
 class AssignProgram(APIView):
@@ -153,8 +164,8 @@ class RandomWodView(APIView):
 
     def get(self, request, format=None):
         number_objects = len(WODs.objects.all())
-        random_id = random.randint(0, number_objects - 1)
-        random_wod = WODs.objects.get(pk=random_id).values_list(
+        random_id = random.randint(1, number_objects)
+        random_wod = WODs.objects.filter(pk=random_id).values_list(
             'id',
             'title',
             'modality',
@@ -166,22 +177,27 @@ class RandomWodView(APIView):
 class WodResultsView(APIView):
     '''Представление для результатов выполнения WOD'''
 
-    def post(self, request, format=None):
-        wod_id = request.data.get('wod_id')
-        user_tlg_id = request.data.get('user_tlg_id')
-        user_wod_result = request.data.get('user_wod_result')
-
-        wod_obj = WODs.objects.get(pk=wod_id)
-        user_obj = BotUsers.objects.get(pk=user_tlg_id)
-        serializer = UsersWodResultsSerializer(
-            wod=wod_obj,
-            user=user_obj,
-            result=user_wod_result,
+    def get(self, request, format=None):
+        last_results = UsersWodResults.objects.all()[:5].values_list(
+            'wod__title',
+            'user__user_tlg_name',
+            'result',
+            'date',
         )
+        return Response(last_results, status.HTTP_200_OK)
+
+    # {"wod": 1, "user": 1, "result": "7 мин. 56 сек."}
+
+    def post(self, request, format=None):
+        print(f'WE ARE HERE...\n{request.data}')
+        serializer = UsersWodResultsSerializer(data=request.data)
         if serializer.is_valid():
+            print('WE ARE HERE...5')
+            wod_instance = WODs.objects.get(pk=serializer.data.get('wod'))
+            user_instance = BotUsers.objects.get(pk=serializer.data.get('user'))
             new_result = UsersWodResults(
-            wod=serializer.data.get('wod'),
-            user=serializer.data.get('user'),
+            wod=wod_instance,
+            user=user_instance,
             result=serializer.data.get('result'),
             )
             new_result.save()
@@ -196,7 +212,7 @@ class CoachViews(APIView):
     def get(self, request, format=None):
         coach_id = request.query_params.get('coach_id')
         if coach_id:
-            coach_obj = Coaches.objects.get(pk=coach_id).values_list(
+            coach_obj = Coaches.objects.filter(pk=coach_id).values_list(
                 'id',
                 'tlg_photo_id',
                 'coach_tlg_id',

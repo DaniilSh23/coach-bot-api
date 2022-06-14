@@ -97,9 +97,10 @@ class UsersWodResults(models.Model):
     wod = models.ForeignKey(to=WODs, on_delete=models.CASCADE, verbose_name='WOD (комплекс)')
     user = models.ForeignKey(to=BotUsers, on_delete=models.CASCADE, verbose_name='Пользователь')
     result = models.CharField(verbose_name='Результат', max_length=1000)
+    date = models.DateField(verbose_name='Дата выполнения', auto_now_add=True)
 
     class Meta:
-        ordering = ['id']
+        ordering = ['-date']
         db_table = 'Результаты WOD пользователей'
         verbose_name = 'Результат WOD пользователя'
         verbose_name_plural = 'Результаты WOD пользователей'
