@@ -1,5 +1,7 @@
 from django.db import models
 
+C = models.CharField(verbose_name='Имя пользователя в телеграме', max_length=100, blank=True, null=True)
+
 
 class BotUsers(models.Model):
     '''Пользователи бота'''

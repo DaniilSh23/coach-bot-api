@@ -6,7 +6,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.models import BotUsers, UsersTrainingResults, TrainingsForPrograms, Programs, WODs, UsersWodResults, Coaches
-from api.serializers import UsersTrainingResultsSerializer, UsersWodResultsSerializer, ProgramsSerializer
+from api.serializers import UsersTrainingResultsSerializer, UsersWodResultsSerializer, ProgramsSerializer, \
+    BotUsersSerializer
 
 
 class UserInfoView(APIView):
@@ -29,6 +30,19 @@ class UserInfoView(APIView):
         else:
             return Response(status.HTTP_400_BAD_REQUEST)
 
+    def post(self, request, format=None):
+        serializer = BotUsersSerializer(data=request.data)
+        if serializer.is_valid():
+            user_tlg_id = serializer.data.get('user_tlg_id')
+            BotUsers.objects.update_or_create(user_tlg_id=user_tlg_id,
+                                              defaults={
+                                                  'user_tlg_id': user_tlg_id,
+                                                  'user_tlg_name': serializer.data.get('user_tlg_name')
+                                              })
+            return Response(status.HTTP_200_OK)
+        else:
+            return Response(status.HTTP_400_BAD_REQUEST)
+
 
 class UserTrainingProgramView(APIView):
     '''Представление информации о программе тренировок пользователя'''
@@ -44,6 +58,9 @@ class UserTrainingProgramView(APIView):
                 'program__numbers_of_trainings',
                 'program__workout_duration',
                 'program__recommended_number_of_trainings',
+                'training__training_number',
+                'training__id',
+                'program__id',
             )
             return Response(result_object, status.HTTP_200_OK)
         else:
@@ -58,6 +75,8 @@ class UserCurrentTraningView(APIView):
         if user_tlg_id:
             training_object = BotUsers.objects.filter(user_tlg_id=user_tlg_id).select_related('training')
             result_object = training_object.values_list(
+                'training__id',
+                'program__title',
                 'training__training_number',
                 'training__training_description',
             )
@@ -72,7 +91,7 @@ class UserTrainingResultsView(APIView):
     def get(self, request, format=None):
         user_tlg_id = request.query_params.get('user_tlg_id')
         training_id = request.query_params.get('id')
-        if user_tlg_id:
+        if not training_id:
             # если есть user_tlg_id, то получаем список всех результатов тренировок
             user_results = UsersTrainingResults.objects.filter(user__user_tlg_id=user_tlg_id).select_related('user')
             results_objects = UsersTrainingResultsSerializer(user_results, many=True)
